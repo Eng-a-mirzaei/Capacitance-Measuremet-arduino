@@ -1,0 +1,121 @@
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(6, 7, 2, 3, 4, 5);
+const int analog_charge = A2;
+const int analogPin = A0;
+float ck=24.42;
+int voltage;
+float cu;
+int i=0;
+
+void setup()
+{
+  
+Serial.begin(9600);
+    //Serial.println("CLEARDATA"); // clears sheet starting at row 2
+    Serial.println("CLEARSHEET"); // clears sheet starting at row 1
+    
+  // define 5 columns named "Date", "Time", "Timer", "Counter" and "millis"
+    Serial.println("LABEL,Date,TIME");
+
+  // set the names for the 3 checkboxes
+    Serial.println("CUSTOMBOX1,LABEL,Capacitance");
+    Serial.println("CUSTOMBOX2,LABEL,Calibration");
+    Serial.println("CUSTOMBOX3,LABEL,Fixing");
+
+  // check 2 of the 3 checkboxes (first two to true, third to false)
+    Serial.println("CUSTOMBOX1,SET,1");
+    Serial.println("CUSTOMBOX2,SET,1");
+    Serial.println("CUSTOMBOX3,SET,0");
+
+  
+lcd.begin(16, 2);
+lcd.print(" 20pF<to>1000nF ");
+lcd.setCursor(0,1);
+lcd.print("place capacitor ");
+pinMode(analogPin,OUTPUT);
+pinMode(analog_charge,OUTPUT);
+}
+
+void loop()
+{
+
+ Serial.println( (String) "DATA,DATE,TIME," + i++ + "," + millis() + ",AUTOSCROLL_20" );
+  
+     abc:
+     pinMode(analogPin,INPUT);
+     digitalWrite(analog_charge,HIGH);
+     voltage=analogRead(analogPin);
+     digitalWrite(analog_charge,LOW);
+     //analog_charge = 998 || 999 || 1000 || 1001 and ! 1024
+     pinMode(analogPin,OUTPUT);
+      if(voltage<1000)
+     {
+      cu=((ck*voltage)/(1024.0-voltage));
+      if(cu>20.0)
+      {
+       lcd.setCursor(0,1);
+       lcd.print("                ");
+       lcd.setCursor(0,1);
+       lcd.print(cu,2);
+       lcd.print("pF"); 
+       Serial.println(cu);
+       
+      }
+      else
+      {
+       lcd.setCursor(0,1);
+       lcd.print("place capacitor ");
+       delay(1000);
+       lcd.setCursor(0,1);
+       lcd.print("                ");  
+       delay(1000);
+       goto abc;
+      }
+     }
+    else
+    {
+      voltage=0;
+      pinMode(analogPin,OUTPUT);
+      delay(1);
+      pinMode(analog_charge,INPUT_PULLUP);
+      unsigned long start_time = micros();
+      unsigned long final_time=0;
+     
+      while((voltage < 1) && (final_time < 400000L))
+      {
+        voltage = digitalRead(analog_charge);
+        unsigned long stop_time = micros();
+        final_time = stop_time > start_time ? stop_time - start_time : start_time - stop_time;
+      }
+
+      pinMode(analog_charge, INPUT);  
+      voltage = analogRead(analog_charge);
+      digitalWrite(analogPin, HIGH);
+      int delay_T = (int)(final_time / 1000L) * 5;
+      delay(delay_T);   
+      pinMode(analog_charge, OUTPUT);  
+      digitalWrite(analog_charge, LOW);
+      digitalWrite(analogPin, LOW);
+
+      cu = -(float)final_time / 34.8 ;
+      cu /= log(1.0 - (float)voltage / (float)1023);
+      if(cu < 1000.0)
+      {
+       lcd.setCursor(0,1);
+       lcd.print("                ");
+       lcd.setCursor(0,1);
+       lcd.print(cu,2);
+       lcd.print("nF"); 
+       Serial.println(cu*1000);
+      }
+      else
+      {
+       lcd.setCursor(0,1);
+       lcd.print("                ");
+       lcd.setCursor(0,1);
+       lcd.print("**Out of Range**");
+        Serial.println("**Out of Range**");
+      }
+    }
+    delay(1000);
+}
